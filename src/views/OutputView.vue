@@ -21,7 +21,7 @@ export default defineComponent({
 
         const goHome = () => {
             console.log(route.path)
-            router.push({name: "Temp"})
+            router.push({name: "Home"})
         }
 
         return {

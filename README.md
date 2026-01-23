@@ -1,4 +1,4 @@
-# anime-review-front
+# LoadSight Vue
 
 ## Project setup
 ```
