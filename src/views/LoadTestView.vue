@@ -21,6 +21,11 @@
           <v-divider></v-divider>
           <v-card-text v-if="isRunning" class="pa-4">
             <div class="current-test-info">
+              <div v-if="config.testName" class="info-row">
+                <v-icon color="primary" size="20">mdi-format-title</v-icon>
+                <span class="info-label">테스트 이름:</span>
+                <span class="info-value">{{ config.testName }}</span>
+              </div>
               <div class="info-row">
                 <v-icon color="primary" size="20">mdi-web</v-icon>
                 <span class="info-label">Method:</span>
@@ -102,7 +107,7 @@
                   </v-avatar>
                 </template>
                 <v-list-item-title class="history-title">
-                  {{ test.testConfig.method }} {{ formatUrl(test.testConfig.url) }}
+                  {{ test.testName || test.testConfig.testName || `${test.testConfig.method} ${formatUrl(test.testConfig.url)}` }}
                 </v-list-item-title>
                 <v-list-item-subtitle class="history-subtitle">
                   <div class="d-flex align-center mt-1">
@@ -139,8 +144,41 @@
           </v-card-title>
           <v-divider></v-divider>
           <v-card-text class="pa-6">
-            <!-- API 설정 섹션 -->
+            <!-- 테스트 정보 섹션 -->
             <v-expansion-panels v-model="panels" multiple class="mb-4">
+              <v-expansion-panel class="expansion-panel">
+                <v-expansion-panel-title class="expansion-title">
+                  <v-icon left color="primary">mdi-information</v-icon>
+                  <span class="font-weight-medium">테스트 정보</span>
+                </v-expansion-panel-title>
+                <v-expansion-panel-text>
+                  <v-row>
+                    <v-col cols="12">
+                      <v-text-field
+                        v-model="config.testName"
+                        label="테스트 이름"
+                        placeholder="예: API 부하 테스트 - 사용자 조회"
+                        variant="outlined"
+                        density="comfortable"
+                        prepend-inner-icon="mdi-format-title"
+                        hint="테스트를 식별하기 위한 이름을 입력하세요"
+                      ></v-text-field>
+                    </v-col>
+                    <v-col cols="12">
+                      <v-textarea
+                        v-model="config.description"
+                        label="테스트 설명"
+                        placeholder="이 테스트의 목적이나 설명을 입력하세요"
+                        variant="outlined"
+                        rows="3"
+                        prepend-inner-icon="mdi-text"
+                        hint="테스트에 대한 추가 정보나 목적을 기록하세요"
+                      ></v-textarea>
+                    </v-col>
+                  </v-row>
+                </v-expansion-panel-text>
+              </v-expansion-panel>
+
               <v-expansion-panel class="expansion-panel">
                 <v-expansion-panel-title class="expansion-title">
                   <v-icon left color="primary">mdi-api</v-icon>
@@ -724,6 +762,21 @@
         <v-divider></v-divider>
         <v-card-text v-if="selectedTest" class="pa-4">
           <v-row>
+            <v-col cols="12">
+              <div class="detail-section">
+                <h3 class="detail-title">테스트 정보</h3>
+                <div v-if="selectedTest.testName || selectedTest.testConfig?.testName" class="detail-item">
+                  <span class="detail-label">테스트 이름:</span>
+                  <span class="detail-value">{{ selectedTest.testName || selectedTest.testConfig.testName }}</span>
+                </div>
+                <div v-if="selectedTest.description || selectedTest.testConfig?.description" class="detail-item">
+                  <span class="detail-label">설명:</span>
+                  <span class="detail-value">{{ selectedTest.description || selectedTest.testConfig.description }}</span>
+                </div>
+              </div>
+            </v-col>
+          </v-row>
+          <v-row>
             <v-col cols="12" md="6">
               <div class="detail-section">
                 <h3 class="detail-title">테스트 설정</h3>
@@ -799,7 +852,7 @@ import axios from 'axios'
 export default defineComponent({
   name: 'LoadTestView',
   setup() {
-    const panels = ref([0, 1, 2])
+    const panels = ref([0, 1, 2, 3])
     const isRunning = ref(false)
     const showBearerToken = ref(false)
     const showBasicPassword = ref(false)
@@ -810,6 +863,8 @@ export default defineComponent({
     const elapsedTimeInterval = ref(null)
     
     const config = ref({
+      testName: '',
+      description: '',
       method: 'GET',
       url: '',
       headers: '',
@@ -1359,7 +1414,11 @@ export default defineComponent({
 
     const downloadReport = () => {
       const report = {
+        testName: config.value.testName || '',
+        description: config.value.description || '',
         testConfig: {
+          testName: config.value.testName || '',
+          description: config.value.description || '',
           method: config.value.method,
           url: config.value.url,
           concurrentRequests: config.value.concurrentRequests,
@@ -1400,12 +1459,18 @@ export default defineComponent({
         logs: logs.value
       }
 
+      // 파일명 생성
+      const testNameForFile = config.value.testName 
+        ? config.value.testName.replace(/[^a-zA-Z0-9가-힣]/g, '-').substring(0, 50)
+        : 'load-test-report'
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+
       // JSON 다운로드
       const jsonBlob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' })
       const jsonUrl = URL.createObjectURL(jsonBlob)
       const jsonLink = document.createElement('a')
       jsonLink.href = jsonUrl
-      jsonLink.download = `load-test-report-${new Date().toISOString().replace(/[:.]/g, '-')}.json`
+      jsonLink.download = `${testNameForFile}-${timestamp}.json`
       jsonLink.click()
       URL.revokeObjectURL(jsonUrl)
 
@@ -1431,7 +1496,7 @@ export default defineComponent({
       const csvUrl = URL.createObjectURL(csvBlob)
       const csvLink = document.createElement('a')
       csvLink.href = csvUrl
-      csvLink.download = `load-test-report-${new Date().toISOString().replace(/[:.]/g, '-')}.csv`
+      csvLink.download = `${testNameForFile}-${timestamp}.csv`
       csvLink.click()
       URL.revokeObjectURL(csvUrl)
 
@@ -1493,7 +1558,11 @@ export default defineComponent({
       const testResult = {
         id: Date.now().toString(),
         timestamp: new Date().toISOString(),
+        testName: config.value.testName || '',
+        description: config.value.description || '',
         testConfig: {
+          testName: config.value.testName || '',
+          description: config.value.description || '',
           method: config.value.method,
           url: config.value.url,
           concurrentRequests: config.value.concurrentRequests,
