@@ -847,7 +847,7 @@
 
 <script>
 import { defineComponent, ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import axios from 'axios'
+import { makeTest } from '../api/test'
 
 export default defineComponent({
   name: 'LoadTestView',
@@ -1125,27 +1125,21 @@ export default defineComponent({
         const finalUrl = buildUrlWithQuery(config.value.url)
 
         const axiosConfig = {
-          method: config.value.method.toLowerCase(),
-          url: finalUrl,
-          headers,
+          name: config.value.testName,
+          descriptions: config.value.description,
+          targetUrl: finalUrl,
+          method: config.value.method.toUpperCase(),
+          // headers,
           data: body,
+          thread: config.value.concurrentRequests,
+          totalRequest: config.value.totalRequests,
+          requestInterval: config.value.requestInterval,
+          authType: config.value.authType.replace("-","_"),
+          auth: config.value.auth,
           timeout: 30000
         }
 
-        const response = await axios(axiosConfig)
-        responseTime = Date.now() - startTime
-        statusCode = response.status
-        success = response.status >= 200 && response.status < 300
-        
-        // error_type 계산
-        let errorType = null
-        if (!success) {
-          if (statusCode >= 500 && statusCode < 600) {
-            errorType = '5xx'
-          } else {
-            errorType = 'other'
-          }
-        }
+        const response = await makeTest(axiosConfig)
 
         updateStats(responseTime, success)
         addLog(
@@ -1163,7 +1157,7 @@ export default defineComponent({
           responseTime, // 하위 호환성 유지
           success,
           error: null,
-          errorType
+          errorType: null
         })
 
       } catch (error) {
@@ -1237,27 +1231,16 @@ export default defineComponent({
 
       // 동시 요청 실행
       const executeRequests = async () => {
-        while (completedRequests < totalRequests && !stopFlag) {
-          if (activeRequests < config.value.concurrentRequests) {
-            activeRequests++
-            makeRequest().finally(() => {
-              activeRequests--
-              completedRequests++
-              
-              if (completedRequests >= totalRequests || stopFlag) {
-                if (activeRequests === 0) {
-                  finishTest()
-                }
-              }
-            })
-
-            if (config.value.requestInterval > 0) {
-              await new Promise(resolve => setTimeout(resolve, config.value.requestInterval))
+        makeRequest().finally(() => {
+          activeRequests--
+          completedRequests++
+          
+          if (completedRequests >= totalRequests || stopFlag) {
+            if (activeRequests === 0) {
+              finishTest()
             }
-          } else {
-            await new Promise(resolve => setTimeout(resolve, 10))
           }
-        }
+        })
       }
 
       executeRequests()
